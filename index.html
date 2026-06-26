@@ -1,1 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gesture Voice Explorer</title>
 
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f4ef;
+      color: #1f1f1f;
+      line-height: 1.6;
+    }
+
+    .container {
+      width: min(900px, 92%);
+      margin: 0 auto;
+      padding: 32px 0;
+    }
+
+    .intro,
+    .controls,
+    .readout,
+    .fallback-controls {
+      background: white;
+      border: 2px solid #222;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 1.3rem;
+    }
+
+    button,
+    select,
+    input[type="range"] {
+      font: inherit;
+    }
+
+    button {
+      padding: 10px 16px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      border: 2px solid #222;
+      border-radius: 8px;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled),
+    button:focus:not(:disabled) {
+      background: #e8e8e8;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    select {
+      padding: 8px;
+      border: 2px solid #222;
+      border-radius: 8px;
+    }
+
+    .gesture-area {
+      height: 280px;
+      border: 3px dashed #222;
+      border-radius: 16px;
+      background: #fffdf8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      text-align: center;
+      user-select: none;
+    }
+
+    .gesture-area.active {
+      background: #eef7ff;
+    }
+
+    .small-text {
+      font-size: 0.95rem;
+      margin-top: 0;
+    }
+
+    .fallback-controls label {
+      display: block;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .readout p {
+      margin: 6px 0;
+      font-weight: bold;
+    }
+
+    @media (max-width: 600px) {
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .gesture-area {
+        height: 220px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <section class="intro">
+      <h1>Gesture Voice Explorer</h1>
+
+      <p>
+        This small prototype maps simple user input to voice-like sound using the Web Audio API.
+        Move inside the gesture area to control the sound, or use the sliders below for direct control.
+      </p>
+    </section>
+
+    <section class="controls" aria-label="Audio controls">
+      <button id="startButton">Start Audio</button>
+      <button id="stopButton" disabled>Stop Audio</button>
+
+      <label for="waveformSelect">
+        Tone shape:
+      </label>
+      <select id="waveformSelect">
+        <option value="sine">Sine - smooth</option>
+        <option value="triangle">Triangle - soft bright</option>
+        <option value="square">Square - buzzy</option>
+      </select>
+    </section>
+
+    <section 
+      id="gestureArea" 
+      class="gesture-area" 
+      aria-label="Gesture control area"
+    >
+      <p>Move your mouse or trackpad here</p>
+      <p class="small-text">Left/right changes pitch. Up/down changes volume.</p>
+    </section>
+
+    <section class="readout" aria-label="Current sound values">
+      <p>Pitch: <span id="pitchValue">220</span> Hz</p>
+      <p>Volume: <span id="volumeValue">0.10</span></p>
+      <p>Input mode: <span id="inputMode">Not started</span></p>
+    </section>
+
+    <section class="fallback-controls" aria-label="Alternative slider controls">
+      <h2>Alternative Controls</h2>
+
+      <label for="pitchSlider">
+        Pitch
+      </label>
+      <input 
+        type="range" 
+        id="pitchSlider" 
+        min="100" 
+        max="800" 
+        value="220" 
+      />
+
+      <label for="volumeSlider">
+        Volume
+      </label>
+      <input 
+        type="range" 
+        id="volumeSlider" 
+        min="0" 
+        max="0.3" 
+        step="0.01" 
+        value="0.10" 
+      />
+    </section>
+  </main>
+
+  <script>
+    // We start with variables that will hold our audio objects.
+    let audioContext;
+    let oscillator;
+    let gainNode;
+    let isPlaying = false;
+
+    // These are the default sound values.
+    let currentPitch = 220;
+    let currentVolume = 0.10;
+
+    // Get references to the HTML elements we want to control.
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
+    const waveformSelect = document.getElementById("waveformSelect");
+    const gestureArea = document.getElementById("gestureArea");
+
+    const pitchValue = document.getElementById("pitchValue");
+    const volumeValue = document.getElementById("volumeValue");
+    const inputMode = document.getElementById("inputMode");
+
+    const pitchSlider = document.getElementById("pitchSlider");
+    const volumeSlider = document.getElementById("volumeSlider");
+
+    function startAudio() {
+      if (isPlaying) {
+        return;
+      }
+
+      audioContext = new AudioContext();
+
+      oscillator = audioContext.createOscillator();
+      gainNode = audioContext.createGain();
+
+      oscillator.type = waveformSelect.value;
+      oscillator.frequency.value = currentPitch;
+      gainNode.gain.value = currentVolume;
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.start();
+
+      isPlaying = true;
+
+      startButton.disabled = true;
+      stopButton.disabled = false;
+      inputMode.textContent = "Audio started";
+    }
+
+    function stopAudio() {
+      if (!isPlaying) {
+        return;
+      }
+
+      oscillator.stop();
+      oscillator.disconnect();
+      gainNode.disconnect();
+
+      isPlaying = false;
+
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      inputMode.textContent = "Audio stopped";
+    }
+
+    startButton.addEventListener("click", startAudio);
+    stopButton.addEventListener("click", stopAudio);
+
+    function updateSound(pitch, volume, modeLabel) {
+      currentPitch = pitch;
+      currentVolume = volume;
+
+      pitchValue.textContent = Math.round(currentPitch);
+      volumeValue.textContent = currentVolume.toFixed(2);
+      inputMode.textContent = modeLabel;
+
+      pitchSlider.value = currentPitch;
+      volumeSlider.value = currentVolume;
+
+      if (isPlaying) {
+        oscillator.frequency.setTargetAtTime(
+          currentPitch,
+          audioContext.currentTime,
+          0.05
+        );
+
+        gainNode.gain.setTargetAtTime(
+          currentVolume,
+          audioContext.currentTime,
+          0.05
+        );
+      }
+    }
+
+    gestureArea.addEventListener("mousemove", function(event) {
+      const rect = gestureArea.getBoundingClientRect();
+
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      const xPercent = x / rect.width;
+      const yPercent = y / rect.height;
+
+      const minPitch = 100;
+      const maxPitch = 800;
+
+      const minVolume = 0.02;
+      const maxVolume = 0.30;
+
+      const newPitch = minPitch + xPercent * (maxPitch - minPitch);
+
+      const invertedY = 1 - yPercent;
+      const newVolume = minVolume + invertedY * (maxVolume - minVolume);
+
+      updateSound(newPitch, newVolume, "Mouse gesture area");
+    });
+
+    gestureArea.addEventListener("mouseenter", function() {
+      gestureArea.classList.add("active");
+    });
+
+    gestureArea.addEventListener("mouseleave", function() {
+      gestureArea.classList.remove("active");
+    });
+
+    pitchSlider.addEventListener("input", function() {
+      const pitch = Number(pitchSlider.value);
+      const volume = Number(volumeSlider.value);
+
+      updateSound(pitch, volume, "Pitch slider");
+    });
+
+    volumeSlider.addEventListener("input", function() {
+      const pitch = Number(pitchSlider.value);
+      const volume = Number(volumeSlider.value);
+
+      updateSound(pitch, volume, "Volume slider");
+    });
+
+    waveformSelect.addEventListener("change", function() {
+      if (isPlaying) {
+        oscillator.type = waveformSelect.value;
+      }
+    });
+  </script>
+</body>
+</html>
