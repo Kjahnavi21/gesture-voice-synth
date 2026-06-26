@@ -6,132 +6,183 @@
   <title>Gesture Voice Explorer</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+  * {
+    box-sizing: border-box;
+  }
 
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f7f4ef;
-      color: #1f1f1f;
-      line-height: 1.6;
-    }
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f7f4ef;
+    color: #1f1f1f;
+    line-height: 1.4;
+  }
 
+  .container {
+    width: min(1100px, 94%);
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 16px 0;
+
+    display: grid;
+    grid-template-columns: 1.3fr 0.9fr;
+    grid-template-areas:
+      "intro intro"
+      "controls controls"
+      "gesture readout"
+      "gesture fallback";
+    gap: 14px;
+  }
+
+  .intro {
+    grid-area: intro;
+  }
+
+  .controls {
+    grid-area: controls;
+  }
+
+  .gesture-area {
+    grid-area: gesture;
+  }
+
+  .readout {
+    grid-area: readout;
+  }
+
+  .fallback-controls {
+    grid-area: fallback;
+  }
+
+  .intro,
+  .controls,
+  .readout,
+  .fallback-controls {
+    background: white;
+    border: 2px solid #222;
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  h1 {
+    margin: 0 0 10px 0;
+    font-size: 2rem;
+  }
+
+  h2 {
+    margin: 0 0 12px 0;
+    font-size: 1.25rem;
+  }
+
+  p {
+    margin: 6px 0;
+  }
+
+  button,
+  select,
+  input[type="range"] {
+    font: inherit;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    padding: 10px 16px;
+    border: 2px solid #222;
+    border-radius: 8px;
+    background: #ffffff;
+    cursor: pointer;
+  }
+
+  button:hover:not(:disabled),
+  button:focus:not(:disabled) {
+    background: #e8e8e8;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  select {
+    padding: 8px;
+    border: 2px solid #222;
+    border-radius: 8px;
+  }
+
+  .gesture-area {
+    min-height: 360px;
+    border: 3px dashed #222;
+    border-radius: 16px;
+    background: #fffdf8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+    user-select: none;
+    padding: 20px;
+  }
+
+  .gesture-area.active {
+    background: #eef7ff;
+  }
+
+  .small-text {
+    font-size: 0.95rem;
+  }
+
+  .readout p {
+    margin: 8px 0;
+    font-weight: bold;
+  }
+
+  .fallback-controls label {
+    display: block;
+    margin-top: 12px;
+    font-weight: bold;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  @media (max-width: 800px) {
     .container {
-      width: min(900px, 92%);
-      margin: 0 auto;
-      padding: 32px 0;
+      display: block;
+      padding: 16px 0;
     }
 
     .intro,
     .controls,
+    .gesture-area,
     .readout,
     .fallback-controls {
-      background: white;
-      border: 2px solid #222;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      margin-top: 0;
-      font-size: 2rem;
-    }
-
-    h2 {
-      margin-top: 0;
-      font-size: 1.3rem;
-    }
-
-    button,
-    select,
-    input[type="range"] {
-      font: inherit;
-    }
-
-    button {
-      padding: 10px 16px;
-      margin-right: 10px;
-      margin-bottom: 10px;
-      border: 2px solid #222;
-      border-radius: 8px;
-      background: #ffffff;
-      cursor: pointer;
-    }
-
-    button:hover:not(:disabled),
-    button:focus:not(:disabled) {
-      background: #e8e8e8;
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    select {
-      padding: 8px;
-      border: 2px solid #222;
-      border-radius: 8px;
+      margin-bottom: 14px;
     }
 
     .gesture-area {
-      height: 280px;
-      border: 3px dashed #222;
-      border-radius: 16px;
-      background: #fffdf8;
-      display: flex;
+      min-height: 240px;
+    }
+
+    .controls {
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      text-align: center;
-      user-select: none;
+      align-items: stretch;
     }
 
-    .gesture-area.active {
-      background: #eef7ff;
-    }
-
-    .small-text {
-      font-size: 0.95rem;
-      margin-top: 0;
-    }
-
-    .fallback-controls label {
-      display: block;
-      margin-top: 16px;
-      font-weight: bold;
-    }
-
-    input[type="range"] {
+    button,
+    select {
       width: 100%;
-      margin-top: 8px;
     }
-
-    .readout p {
-      margin: 6px 0;
-      font-weight: bold;
-    }
-
-    @media (max-width: 600px) {
-      .controls {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      button {
-        width: 100%;
-      }
-
-      .gesture-area {
-        height: 220px;
-      }
-    }
-  </style>
+  }
+</style>
 </head>
 
 <body>
@@ -174,32 +225,36 @@
       <p>Input mode: <span id="inputMode">Not started</span></p>
     </section>
 
-    <section class="fallback-controls" aria-label="Alternative slider controls">
-      <h2>Alternative Controls</h2>
+<section class="fallback-controls" aria-label="Fine-tune sound controls">
+  <h2>Fine-Tune Controls</h2>
 
-      <label for="pitchSlider">
-        Pitch
-      </label>
-      <input 
-        type="range" 
-        id="pitchSlider" 
-        min="100" 
-        max="800" 
-        value="220" 
-      />
+  <p class="small-text">
+    These sliders provide a direct way to adjust the same sound parameters controlled by the gesture area.
+  </p>
 
-      <label for="volumeSlider">
-        Volume
-      </label>
-      <input 
-        type="range" 
-        id="volumeSlider" 
-        min="0" 
-        max="0.3" 
-        step="0.01" 
-        value="0.10" 
-      />
-    </section>
+  <label for="pitchSlider">
+    Pitch
+  </label>
+  <input 
+    type="range" 
+    id="pitchSlider" 
+    min="100" 
+    max="800" 
+    value="220" 
+  />
+
+  <label for="volumeSlider">
+    Volume
+  </label>
+  <input 
+    type="range" 
+    id="volumeSlider" 
+    min="0" 
+    max="0.3" 
+    step="0.01" 
+    value="0.10" 
+  />
+</section>
   </main>
 
   <script>
