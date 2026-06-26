@@ -116,7 +116,7 @@
       border-radius: 16px;
       background: #111;
 
-      /* This mirrors the preview so it feels like a mirror. */
+      /* Mirrors the preview so it feels natural to the user. */
       transform: scaleX(-1);
     }
 
@@ -166,7 +166,7 @@
 
       <p>
         This optional experiment uses webcam input to control sound in the browser.
-        It compares each camera frame to the previous frame, finds where movement is happening,
+        It compares each camera frame to the previous frame, estimates where movement is happening,
         and maps that movement position to audio.
       </p>
 
@@ -197,7 +197,7 @@
 
       <!-- 
         The canvas is hidden.
-        We use it only so JavaScript can read webcam pixel data.
+        JavaScript uses it to read webcam pixel data.
       -->
       <canvas id="canvas" width="160" height="120"></canvas>
 
@@ -206,15 +206,15 @@
       </p>
     </section>
 
-    <section class="readout" aria-label="Current webcam and sound values">
-      <h2>Live Values</h2>
+    <section class="readout" aria-label="Current sound values">
+      <h2>Live Sound Values</h2>
 
-      <p>Status: <span id="statusValue">Not started</span></p>
-      <p>Movement X: <span id="motionXValue">--</span></p>
-      <p>Movement Y: <span id="motionYValue">--</span></p>
-      <p>Active Motion: <span id="motionAmountValue">0.000</span></p>
       <p>Pitch: <span id="pitchValue">220</span> Hz</p>
       <p>Volume: <span id="volumeValue">0.01</span></p>
+
+      <p class="small-text">
+        The displayed values are smoothed so the sound does not jump too sharply.
+      </p>
     </section>
   </main>
 
@@ -234,25 +234,25 @@
     let currentPitch = 220;
     let currentVolume = 0.01;
 
+    // Smoothed movement values reduce jitter.
+    let smoothedMotionX = 0.5;
+    let smoothedMotionY = 0.5;
+
     // Button elements
     const startCameraButton = document.getElementById("startCameraButton");
     const stopCameraButton = document.getElementById("stopCameraButton");
     const startAudioButton = document.getElementById("startAudioButton");
     const stopAudioButton = document.getElementById("stopAudioButton");
 
-    // Other controls
+    // Tone selector
     const waveformSelect = document.getElementById("waveformSelect");
 
-    // Video and canvas
+    // Video and canvas elements
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const canvasContext = canvas.getContext("2d");
 
     // Readout values
-    const statusValue = document.getElementById("statusValue");
-    const motionXValue = document.getElementById("motionXValue");
-    const motionYValue = document.getElementById("motionYValue");
-    const motionAmountValue = document.getElementById("motionAmountValue");
     const pitchValue = document.getElementById("pitchValue");
     const volumeValue = document.getElementById("volumeValue");
 
@@ -269,11 +269,9 @@
         startCameraButton.disabled = true;
         stopCameraButton.disabled = false;
 
-        statusValue.textContent = "Camera started - waiting for movement";
-
         analyzeCameraFrame();
       } catch (error) {
-        statusValue.textContent = "Camera access failed";
+        alert("Camera access failed. Please allow webcam permission and try again.");
         console.error("Camera error:", error);
       }
     }
@@ -290,19 +288,19 @@
       cameraStream = null;
       previousFrame = null;
 
-      cancelAnimationFrame(animationId);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
 
       video.srcObject = null;
 
       startCameraButton.disabled = false;
       stopCameraButton.disabled = true;
 
-      statusValue.textContent = "Camera stopped";
-
       // Quiet the sound if audio is still on.
       currentVolume = 0.01;
-      updateAudioNodes();
       volumeValue.textContent = currentVolume.toFixed(2);
+      updateAudioNodes();
     }
 
     function startAudio() {
@@ -328,8 +326,6 @@
 
       startAudioButton.disabled = true;
       stopAudioButton.disabled = false;
-
-      statusValue.textContent = "Audio started";
     }
 
     function stopAudio() {
@@ -345,8 +341,6 @@
 
       startAudioButton.disabled = false;
       stopAudioButton.disabled = true;
-
-      statusValue.textContent = "Audio stopped";
     }
 
     function analyzeCameraFrame() {
@@ -408,8 +402,6 @@
         }
       }
 
-      const motionAmount = changedPixelCount / totalPixelCount;
-
       let motionX = null;
       let motionY = null;
 
@@ -422,9 +414,9 @@
         const averageY = sumY / changedPixelCount;
 
         /*
-          The video preview is mirrored using CSS.
-          The canvas data itself is not mirrored, so we flip X here
-          so the sound matches what the user sees.
+          The preview is mirrored with CSS.
+          The canvas data itself is not mirrored, so X is flipped here
+          to make the sound match what the user sees.
         */
         motionX = 1 - averageX / canvas.width;
         motionY = averageY / canvas.height;
@@ -432,36 +424,39 @@
 
       previousFrame = new Uint8ClampedArray(pixels);
 
-      updateSoundFromMotion(motionX, motionY, motionAmount);
+      updateSoundFromMotion(motionX, motionY);
 
       animationId = requestAnimationFrame(analyzeCameraFrame);
     }
 
-    function updateSoundFromMotion(motionX, motionY, motionAmount) {
+    function updateSoundFromMotion(motionX, motionY) {
       const minPitch = 120;
       const maxPitch = 800;
 
       const minVolume = 0.01;
       const maxVolume = 0.30;
 
+      /*
+        If not enough movement is detected, keep the previous sound values.
+        This prevents pitch and volume from snapping back to the minimum.
+      */
       if (motionX === null || motionY === null) {
-        currentVolume = minVolume;
-
-        statusValue.textContent = "Camera started - waiting for movement";
-        motionXValue.textContent = "--";
-        motionYValue.textContent = "--";
-        motionAmountValue.textContent = motionAmount.toFixed(3);
-      } else {
-        currentPitch = minPitch + motionX * (maxPitch - minPitch);
-
-        const invertedY = 1 - motionY;
-        currentVolume = minVolume + invertedY * (maxVolume - minVolume);
-
-        statusValue.textContent = "Tracking movement";
-        motionXValue.textContent = motionX.toFixed(2);
-        motionYValue.textContent = motionY.toFixed(2);
-        motionAmountValue.textContent = motionAmount.toFixed(3);
+        pitchValue.textContent = Math.round(currentPitch);
+        volumeValue.textContent = currentVolume.toFixed(2);
+        return;
       }
+
+      /*
+        Smooth the detected movement position.
+        This reduces jitter from frame-to-frame camera noise.
+      */
+      smoothedMotionX = smoothedMotionX * 0.85 + motionX * 0.15;
+      smoothedMotionY = smoothedMotionY * 0.85 + motionY * 0.15;
+
+      currentPitch = minPitch + smoothedMotionX * (maxPitch - minPitch);
+
+      const invertedY = 1 - smoothedMotionY;
+      currentVolume = minVolume + invertedY * (maxVolume - minVolume);
 
       pitchValue.textContent = Math.round(currentPitch);
       volumeValue.textContent = currentVolume.toFixed(2);
