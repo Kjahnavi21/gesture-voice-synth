@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Webcam Gesture Sound Experiment</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f4ef;
+      color: #1f1f1f;
+      line-height: 1.4;
+    }
+
+    .container {
+      width: min(1100px, 94%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 16px 0;
+
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      grid-template-areas:
+        "intro intro"
+        "controls controls"
+        "video readout";
+      gap: 14px;
+    }
+
+    .intro {
+      grid-area: intro;
+    }
+
+    .controls {
+      grid-area: controls;
+    }
+
+    .video-panel {
+      grid-area: video;
+    }
+
+    .readout {
+      grid-area: readout;
+    }
+
+    .intro,
+    .controls,
+    .video-panel,
+    .readout {
+      background: white;
+      border: 2px solid #222;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 0 0 12px 0;
+      font-size: 1.25rem;
+    }
+
+    p {
+      margin: 6px 0;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: 2px solid #222;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled),
+    button:focus:not(:disabled) {
+      background: #e8e8e8;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    select {
+      padding: 8px;
+      border: 2px solid #222;
+      border-radius: 8px;
+    }
+
+    video {
+      width: 100%;
+      border: 3px dashed #222;
+      border-radius: 16px;
+      background: #111;
+
+      /* This mirrors the preview so it feels like a mirror. */
+      transform: scaleX(-1);
+    }
+
+    canvas {
+      display: none;
+    }
+
+    .readout p {
+      margin: 10px 0;
+      font-weight: bold;
+    }
+
+    .small-text {
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 800px) {
+      .container {
+        display: block;
+        padding: 16px 0;
+      }
+
+      .intro,
+      .controls,
+      .video-panel,
+      .readout {
+        margin-bottom: 14px;
+      }
+
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      button,
+      select {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <section class="intro">
+      <h1>Webcam Gesture Sound Experiment</h1>
+
+      <p>
+        This optional experiment uses webcam input to control sound in the browser.
+        It compares each camera frame to the previous frame, finds where movement is happening,
+        and maps that movement position to audio.
+      </p>
+
+      <p class="small-text">
+        Movement left/right changes pitch. Movement up/down changes volume.
+      </p>
+    </section>
+
+    <section class="controls" aria-label="Webcam and audio controls">
+      <button id="startCameraButton">Start Camera</button>
+      <button id="stopCameraButton" disabled>Stop Camera</button>
+
+      <button id="startAudioButton">Start Audio</button>
+      <button id="stopAudioButton" disabled>Stop Audio</button>
+
+      <label for="waveformSelect">Tone shape:</label>
+      <select id="waveformSelect">
+        <option value="sine">Sine - smooth</option>
+        <option value="triangle">Triangle - soft bright</option>
+        <option value="square">Square - buzzy</option>
+      </select>
+    </section>
+
+    <section class="video-panel" aria-label="Webcam preview">
+      <h2>Camera Input</h2>
+
+      <video id="video" autoplay playsinline muted></video>
+
+      <!-- 
+        The canvas is hidden.
+        We use it only so JavaScript can read webcam pixel data.
+      -->
+      <canvas id="canvas" width="160" height="120"></canvas>
+
+      <p class="small-text">
+        Try moving your hand or face in different parts of the camera frame.
+      </p>
+    </section>
+
+    <section class="readout" aria-label="Current webcam and sound values">
+      <h2>Live Values</h2>
+
+      <p>Status: <span id="statusValue">Not started</span></p>
+      <p>Movement X: <span id="motionXValue">--</span></p>
+      <p>Movement Y: <span id="motionYValue">--</span></p>
+      <p>Active Motion: <span id="motionAmountValue">0.000</span></p>
+      <p>Pitch: <span id="pitchValue">220</span> Hz</p>
+      <p>Volume: <span id="volumeValue">0.01</span></p>
+    </section>
+  </main>
+
+  <script>
+    // Audio variables
+    let audioContext;
+    let oscillator;
+    let gainNode;
+    let isAudioPlaying = false;
+
+    // Webcam variables
+    let cameraStream;
+    let animationId;
+    let previousFrame = null;
+
+    // Default sound values
+    let currentPitch = 220;
+    let currentVolume = 0.01;
+
+    // Button elements
+    const startCameraButton = document.getElementById("startCameraButton");
+    const stopCameraButton = document.getElementById("stopCameraButton");
+    const startAudioButton = document.getElementById("startAudioButton");
+    const stopAudioButton = document.getElementById("stopAudioButton");
+
+    // Other controls
+    const waveformSelect = document.getElementById("waveformSelect");
+
+    // Video and canvas
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const canvasContext = canvas.getContext("2d");
+
+    // Readout values
+    const statusValue = document.getElementById("statusValue");
+    const motionXValue = document.getElementById("motionXValue");
+    const motionYValue = document.getElementById("motionYValue");
+    const motionAmountValue = document.getElementById("motionAmountValue");
+    const pitchValue = document.getElementById("pitchValue");
+    const volumeValue = document.getElementById("volumeValue");
+
+    async function startCamera() {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+
+        video.srcObject = cameraStream;
+        await video.play();
+
+        startCameraButton.disabled = true;
+        stopCameraButton.disabled = false;
+
+        statusValue.textContent = "Camera started - waiting for movement";
+
+        analyzeCameraFrame();
+      } catch (error) {
+        statusValue.textContent = "Camera access failed";
+        console.error("Camera error:", error);
+      }
+    }
+
+    function stopCamera() {
+      if (!cameraStream) {
+        return;
+      }
+
+      cameraStream.getTracks().forEach(function(track) {
+        track.stop();
+      });
+
+      cameraStream = null;
+      previousFrame = null;
+
+      cancelAnimationFrame(animationId);
+
+      video.srcObject = null;
+
+      startCameraButton.disabled = false;
+      stopCameraButton.disabled = true;
+
+      statusValue.textContent = "Camera stopped";
+
+      // Quiet the sound if audio is still on.
+      currentVolume = 0.01;
+      updateAudioNodes();
+      volumeValue.textContent = currentVolume.toFixed(2);
+    }
+
+    function startAudio() {
+      if (isAudioPlaying) {
+        return;
+      }
+
+      audioContext = new AudioContext();
+
+      oscillator = audioContext.createOscillator();
+      gainNode = audioContext.createGain();
+
+      oscillator.type = waveformSelect.value;
+      oscillator.frequency.value = currentPitch;
+      gainNode.gain.value = currentVolume;
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.start();
+
+      isAudioPlaying = true;
+
+      startAudioButton.disabled = true;
+      stopAudioButton.disabled = false;
+
+      statusValue.textContent = "Audio started";
+    }
+
+    function stopAudio() {
+      if (!isAudioPlaying) {
+        return;
+      }
+
+      oscillator.stop();
+      oscillator.disconnect();
+      gainNode.disconnect();
+
+      isAudioPlaying = false;
+
+      startAudioButton.disabled = false;
+      stopAudioButton.disabled = true;
+
+      statusValue.textContent = "Audio stopped";
+    }
+
+    function analyzeCameraFrame() {
+      // Copy the current video frame into the hidden canvas.
+      canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Read pixel data from the canvas.
+      const imageData = canvasContext.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      const pixels = imageData.data;
+
+      let changedPixelCount = 0;
+      let sumX = 0;
+      let sumY = 0;
+
+      const totalPixelCount = pixels.length / 4;
+
+      /*
+        This threshold controls how different a pixel must be from the previous
+        frame before it counts as movement.
+
+        Higher threshold = less sensitive.
+        Lower threshold = more sensitive.
+      */
+      const movementThreshold = 35;
+
+      if (previousFrame) {
+        for (let i = 0; i < pixels.length; i += 4) {
+          const red = pixels[i];
+          const green = pixels[i + 1];
+          const blue = pixels[i + 2];
+
+          const currentBrightness = (red + green + blue) / 3;
+
+          const previousRed = previousFrame[i];
+          const previousGreen = previousFrame[i + 1];
+          const previousBlue = previousFrame[i + 2];
+
+          const previousBrightness =
+            (previousRed + previousGreen + previousBlue) / 3;
+
+          const difference = Math.abs(currentBrightness - previousBrightness);
+
+          if (difference > movementThreshold) {
+            const pixelIndex = i / 4;
+
+            const x = pixelIndex % canvas.width;
+            const y = Math.floor(pixelIndex / canvas.width);
+
+            changedPixelCount++;
+            sumX += x;
+            sumY += y;
+          }
+        }
+      }
+
+      const motionAmount = changedPixelCount / totalPixelCount;
+
+      let motionX = null;
+      let motionY = null;
+
+      /*
+        We only calculate movement position if enough pixels changed.
+        This helps avoid random camera noise controlling the sound.
+      */
+      if (changedPixelCount > 25) {
+        const averageX = sumX / changedPixelCount;
+        const averageY = sumY / changedPixelCount;
+
+        /*
+          The video preview is mirrored using CSS.
+          The canvas data itself is not mirrored, so we flip X here
+          so the sound matches what the user sees.
+        */
+        motionX = 1 - averageX / canvas.width;
+        motionY = averageY / canvas.height;
+      }
+
+      previousFrame = new Uint8ClampedArray(pixels);
+
+      updateSoundFromMotion(motionX, motionY, motionAmount);
+
+      animationId = requestAnimationFrame(analyzeCameraFrame);
+    }
+
+    function updateSoundFromMotion(motionX, motionY, motionAmount) {
+      const minPitch = 120;
+      const maxPitch = 800;
+
+      const minVolume = 0.01;
+      const maxVolume = 0.30;
+
+      if (motionX === null || motionY === null) {
+        currentVolume = minVolume;
+
+        statusValue.textContent = "Camera started - waiting for movement";
+        motionXValue.textContent = "--";
+        motionYValue.textContent = "--";
+        motionAmountValue.textContent = motionAmount.toFixed(3);
+      } else {
+        currentPitch = minPitch + motionX * (maxPitch - minPitch);
+
+        const invertedY = 1 - motionY;
+        currentVolume = minVolume + invertedY * (maxVolume - minVolume);
+
+        statusValue.textContent = "Tracking movement";
+        motionXValue.textContent = motionX.toFixed(2);
+        motionYValue.textContent = motionY.toFixed(2);
+        motionAmountValue.textContent = motionAmount.toFixed(3);
+      }
+
+      pitchValue.textContent = Math.round(currentPitch);
+      volumeValue.textContent = currentVolume.toFixed(2);
+
+      updateAudioNodes();
+    }
+
+    function updateAudioNodes() {
+      if (!isAudioPlaying) {
+        return;
+      }
+
+      oscillator.frequency.setTargetAtTime(
+        currentPitch,
+        audioContext.currentTime,
+        0.05
+      );
+
+      gainNode.gain.setTargetAtTime(
+        currentVolume,
+        audioContext.currentTime,
+        0.05
+      );
+    }
+
+    waveformSelect.addEventListener("change", function() {
+      if (isAudioPlaying) {
+        oscillator.type = waveformSelect.value;
+      }
+    });
+
+    startCameraButton.addEventListener("click", startCamera);
+    stopCameraButton.addEventListener("click", stopCamera);
+
+    startAudioButton.addEventListener("click", startAudio);
+    stopAudioButton.addEventListener("click", stopAudio);
+  </script>
+</body>
+</html>
