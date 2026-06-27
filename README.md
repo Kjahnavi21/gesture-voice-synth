@@ -1,98 +1,176 @@
 # Gesture Voice Explorer
 
-Gesture Voice Explorer is a small browser-based prototype that maps simple user input to voice-like sound using vanilla HTML, CSS, JavaScript, and the Web Audio API.
+Gesture Voice Explorer is a small browser-based creative coding prototype that maps user input to voice-like sound using vanilla HTML, CSS, JavaScript, and the Web Audio API.
 
-The project explores how gesture-like interaction can be translated into sound parameters such as pitch, volume, and tone shape. It is designed as a lightweight creative technology experiment focused on interaction, audio synthesis, and accessible interface design.
+The project explores gesture-to-sound interaction through two experiments:
+
+1. A main mouse/trackpad-based gesture interface
+2. An optional webcam-based motion experiment
+
+Both experiments are lightweight, browser-based, and built without frameworks or build tools.
 
 ## Overview
 
-This prototype lets users control synthesized sound through mouse or trackpad movement inside a gesture area. It also includes direct fine-tune controls for users who prefer sliders over continuous movement.
+The main prototype lets users control synthesized sound by moving inside a gesture area. Horizontal movement changes pitch, vertical movement changes volume, and a tone selector changes the waveform.
 
-The main interaction is:
+The webcam experimental explores how camera input can also be used as a simple gesture signal. It compares the current webcam frame to the previous frame, estimates where movement is happening, and maps that movement position to sound.
 
-- Move left and right to change pitch.
-- Move up and down to change volume.
-- Use the tone selector to change the waveform.
-- Use sliders to directly fine-tune pitch and volume.
+This project is not a medical or therapeutic tool. It is a small experiment in browser-based gesture-to-sound mapping, interaction design, and accessible audio interfaces.
 
-This is not a medical or therapeutic tool. It is a small experiment in browser-based gesture-to-sound mapping.
+## Files
 
-## Demo
+- `index.html`  
+  Main prototype using mouse or trackpad movement to control sound.
 
-Open `index.html` in a browser to run the prototype locally.
+- `webcam-experimental.html`  
+  Optional webcam experiment using browser camera access and canvas-based motion tracking.
 
-## How to Use
+- `README.md`  
+  Project documentation.
+
+## How to Run
+
+### Main Prototype
+
+Open `index.html` directly in a browser.
+
+### Webcam Experiment
+
+The webcam experiment may need to be run through `localhost` or HTTPS because browsers often restrict camera access from local files.
+
+From the project folder, run:
+
+```bash
+python -m http.server 8000
+```
+
+Then open:
+
+```text
+http://localhost:8000/webcam-experimental.html
+```
+
+Allow camera permission when the browser asks.
+
+For comfort, start with your device volume low.
+
+## Main Prototype: Gesture Voice Explorer
+
+The main prototype maps mouse or trackpad movement to sound.
+
+### How to Use
 
 1. Open `index.html` in a browser.
 2. Click **Start Audio**.
 3. Move your mouse or trackpad inside the gesture area.
-4. Move left or right to change the pitch.
-5. Move up or down to change the volume.
+4. Move left or right to change pitch.
+5. Move up or down to change volume.
 6. Use the **Tone shape** dropdown to switch between sine, triangle, and square waves.
 7. Use the **Fine-Tune Controls** sliders for direct pitch and volume control.
 8. Click **Stop Audio** to end the sound.
 
-For comfort, start with your device volume low.
+### Features
 
-## Features
+- Mouse or trackpad movement controls pitch and volume.
+- Sliders provide direct fine-tune controls.
+- Tone shape selector changes the oscillator waveform.
+- Live values show pitch, volume, and input mode.
+- Audio starts only after user interaction.
+- Responsive layout adapts to different screen sizes.
 
-- Built with vanilla HTML, CSS, and JavaScript.
-- Uses the Web Audio API for browser-based sound synthesis.
-- Maps mouse movement to pitch and volume.
-- Includes slider-based fine-tune controls.
-- Provides a tone shape selector for different oscillator waveforms.
-- Shows live pitch, volume, and input mode values.
-- Uses a responsive layout for different screen sizes.
-- Starts audio only after user interaction.
+## Webcam Experiment
+
+The webcam experiment uses camera input as a simple gesture source.
+
+### How It Works
+
+The webcam experiment:
+
+1. Gets webcam access with `navigator.mediaDevices.getUserMedia()`.
+2. Draws each video frame to a hidden `<canvas>`.
+3. Reads pixel data from the canvas.
+4. Compares the current frame to the previous frame.
+5. Finds where movement is happening in the frame.
+6. Maps the movement position to sound.
+
+### Input Mapping
+
+- Movement left or right changes pitch.
+- Movement up or down changes volume.
+- The displayed pitch and volume values are smoothed to reduce jitter.
+
+This version does not use facial landmark tracking. It is a simple motion-based experiment using only built-in browser APIs.
 
 ## Technical Overview
 
-The sound is created using the Web Audio API.
+The audio is created with the Web Audio API.
 
 The audio chain is:
 
-`OscillatorNode -> GainNode -> Audio Destination`
+```text
+OscillatorNode -> GainNode -> Audio Destination
+```
 
 - `OscillatorNode` generates the tone.
 - `GainNode` controls the volume.
-- Mouse position and slider values update the oscillator frequency and gain value.
-- `setTargetAtTime()` smooths pitch and volume changes so the sound does not jump abruptly.
+- User input updates oscillator frequency and gain.
+- `setTargetAtTime()` smooths pitch and volume changes.
 
 ## Input Mapping
 
-The gesture area maps mouse position to audio values.
+### Main Prototype
 
-### Pitch
+In `index.html`:
 
-Horizontal position controls pitch.
+- Mouse X position controls pitch.
+- Mouse Y position controls volume.
+- Sliders provide direct control over the same parameters.
 
-- Left side = lower pitch
-- Right side = higher pitch
+Current pitch range:
 
-Current pitch range: `100 Hz` to `800 Hz`
+```text
+100 Hz to 800 Hz
+```
 
-### Volume
+Current volume range:
 
-Vertical position controls volume.
+```text
+0.02 to 0.30
+```
 
-- Top = louder
-- Bottom = softer
+### Webcam Experiment
 
-Current volume range: `0.02` to `0.30`
+In `webcam-experimental.html`:
+
+- Movement X position controls pitch.
+- Movement Y position controls volume.
+- Motion values are smoothed before updating sound.
+
+Current pitch range:
+
+```text
+120 Hz to 800 Hz
+```
+
+Current volume range:
+
+```text
+0.01 to 0.30
+```
 
 ## Design Choices
 
-### Gesture-Like Interaction
+### Simple Gesture-Based Interaction
 
-Mouse and trackpad movement are used as simple stand-ins for gesture input. This keeps the prototype lightweight while still exploring the idea of mapping physical movement to sound.
+Mouse, trackpad, and webcam motion are used as lightweight stand-ins for gesture input. This keeps the project simple while still exploring how physical movement can shape sound.
 
 ### Fine-Tune Controls
 
-The pitch and volume sliders provide a direct way to control the same sound parameters used in the gesture area. This makes the interface easier to test, easier to understand, and more flexible for users who may prefer labeled controls.
+The main prototype includes pitch and volume sliders. These provide a direct way to control the same sound parameters used in the gesture area. This makes the interface easier to test, easier to understand, and more flexible for users who prefer labeled controls.
 
 ### User-Controlled Audio
 
-The page does not play sound automatically. Users must click **Start Audio** before sound begins. This follows browser audio requirements and gives users control over when sound starts and stops.
+The project does not autoplay sound. Users must click **Start Audio** before sound begins. This follows browser audio requirements and gives users control over when sound starts and stops.
 
 ### Low Default Volume
 
@@ -100,7 +178,7 @@ The default volume is intentionally low to reduce the chance of loud or surprisi
 
 ### Clear Feedback
 
-The interface displays the current pitch, volume, and input mode so users can understand how their actions affect the sound.
+The interface displays live sound values so users can understand how their movement affects the audio.
 
 ### Responsive Layout
 
@@ -116,7 +194,7 @@ This prototype includes:
 - A visible stop button
 - No autoplaying audio
 - Low default volume
-- Multiple ways to control the same sound parameters
+- Multiple ways to control sound parameters
 - Responsive layout for different screen sizes
 
 ## Future Improvements
@@ -124,16 +202,12 @@ This prototype includes:
 Possible future improvements include:
 
 - Adding keyboard controls
-- Adding webcam-based gesture input
-- Exploring MediaPipe Face Mesh for facial landmark tracking
-- Mapping facial gestures to sound parameters
 - Adding calibration for comfortable pitch and volume ranges
-- Exploring more voice-like synthesis techniques
-- Improving visual feedback for remote usability testing
-
-## Files
-
-- `index.html` - Main prototype with HTML, CSS, and JavaScript in one file
+- Adding more voice-like synthesis techniques
+- Adding visual feedback for movement tracking
+- Exploring MediaPipe Face Mesh for facial landmark tracking
+- Mapping facial gestures such as mouth opening, eyebrow movement, or head position to sound parameters
+- Improving webcam stability across different lighting conditions and backgrounds
 
 ## Tools Used
 
@@ -141,3 +215,5 @@ Possible future improvements include:
 - CSS
 - Vanilla JavaScript
 - Web Audio API
+- `getUserMedia()` for webcam access
+- Canvas API for webcam frame analysis
